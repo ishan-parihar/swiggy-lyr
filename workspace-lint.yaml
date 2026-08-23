@@ -1,0 +1,18 @@
+# workspace-lint — keep the repo layout boring
+version: 1
+
+rules:
+  python_package:
+    pattern: "swiggy_lyr/**/*.py"
+    description: "All source lives under swiggy_lyr/"
+
+  tests:
+    pattern: "tests/test_*.py"
+    description: "Tests mirror package layout, fakes in tests/fakes.py"
+
+forbidden:
+  - "**/__pycache__/"
+  - "**/*.pyc"
+  - "**/.DS_Store"
+  - "token.json"
+  - "*.token"

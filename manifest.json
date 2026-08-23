@@ -1,0 +1,30 @@
+{
+  "manifest_version": "0.4",
+  "name": "swiggy-mcp-server",
+  "display_name": "Swiggy MCP Server (swiggy-lyr)",
+  "version": "0.1.0",
+  "description": "Unified Swiggy MCP - Food delivery, Instamart groceries, and Dineout bookings behind one OAuth token",
+  "long_description": "# swiggy-lyr\n\nAggregates Swiggy's three official remote MCP streams (food, instamart, dineout) into a single local stdio server. Dynamic tool proxying keeps schemas in sync with upstream. Ordering tools are safety-gated: SWIGGY_LYR_ALLOW_ORDERS=1 plus confirm=true for checkout.\n\n## Quick start\n\n1. Install: `install.sh` (or `uv sync`)\n2. Auth: `swiggy-lyr --login`\n3. Status: `swiggy-lyr --status`\n4. Run server: `swiggy-lyr`\n",
+  "author": {
+    "name": "Ishan Parihar",
+    "url": "https://github.com/ishan-parihar"
+  },
+  "homepage": "https://github.com/ishan-parihar/swiggy-lyr",
+  "documentation": "https://github.com/ishan-parihar/swiggy-lyr#readme",
+  "license": "MIT",
+  "keywords": [
+    "swiggy",
+    "food-delivery",
+    "instamart",
+    "dineout",
+    "mcp",
+    "ai-agents"
+  ],
+  "tools_note": "Tools are proxied dynamically from mcp.swiggy.com/{food,im,dineout}; call tools/list at runtime for the authoritative set.",
+  "capabilities": {
+    "tools": {
+      "listChanged": true
+    }
+  },
+  "transport": "stdio"
+}
