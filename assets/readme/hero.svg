@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">swiggy-lyr — one Swiggy MCP server for Food, Instamart and Dineout</title>
+  <desc id="hero-desc">Three Swiggy upstream streams (Food 18 tools, Instamart 14 tools, Dineout 12 tools) merge into one local stdio MCP server that hands 44 prefixed tools to your AI agent behind a single OAuth token.</desc>
+
+  <defs>
+    <linearGradient id="merge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fc8019" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fc8019"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="400" rx="26" fill="#161009"/>
+
+  <!-- ── title block (max x ≈ 596) ───────────────────────────────── -->
+  <g transform="translate(64 74)">
+    <text x="0" y="0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="17" letter-spacing="3" fill="#a89a86">MCP SERVER · SWIGGY OFFICIAL STREAMS</text>
+    <text x="-2" y="66" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="68" font-weight="800" fill="#f7f1e8">swiggy-lyr</text>
+    <text x="0" y="116" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="23" fill="#e8ddcd">Order food, groceries and tables by chat.</text>
+    <text x="0" y="150" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="20" fill="#a89a86">Three upstream servers become one. Orders stay gated.</text>
+    <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#87796a">
+      <text x="0" y="216">PYTHON 3.11+</text>
+      <circle cx="128" cy="211" r="2.4" fill="#fc8019"/>
+      <text x="142" y="216">FASTMCP</text>
+      <circle cx="232" cy="211" r="2.4" fill="#fc8019"/>
+      <text x="246" y="216">STDIO</text>
+      <circle cx="318" cy="211" r="2.4" fill="#fc8019"/>
+      <text x="332" y="216">OAUTH 2.1</text>
+    </g>
+    <!-- verified strip -->
+    <g transform="translate(0 252)">
+      <rect width="420" height="42" rx="10" fill="#241a10"/>
+      <circle cx="22" cy="21" r="5" fill="#3fae72"/>
+      <text x="38" y="27" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15.5" fill="#cfc2ae">LIVE-VERIFIED · 44 TOOLS ON PRODUCTION</text>
+    </g>
+  </g>
+
+  <!-- ── merge diagram (640..1156) ───────────────────────────────── -->
+  <g transform="translate(640 46)">
+    <!-- upstream nodes -->
+    <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+      <rect x="0" y="14" width="160" height="62" rx="12" fill="#201710" stroke="#3a2c1c"/>
+      <text x="16" y="41" font-size="18" font-weight="700" fill="#f7f1e8">food</text>
+      <text x="16" y="63" font-size="15" fill="#a89a86">18 tools</text>
+
+      <rect x="0" y="118" width="160" height="62" rx="12" fill="#201710" stroke="#3a2c1c"/>
+      <text x="16" y="145" font-size="18" font-weight="700" fill="#f7f1e8">instamart</text>
+      <text x="16" y="167" font-size="15" fill="#a89a86">14 tools</text>
+
+      <rect x="0" y="222" width="160" height="62" rx="12" fill="#201710" stroke="#3a2c1c"/>
+      <text x="16" y="249" font-size="18" font-weight="700" fill="#f7f1e8">dineout</text>
+      <text x="16" y="271" font-size="15" fill="#a89a86">12 tools</text>
+    </g>
+
+    <!-- converging paths -->
+    <path d="M 160 45 C 210 45 204 140 250 148" fill="none" stroke="#fc8019" stroke-width="2.5" opacity="0.85"/>
+    <path d="M 160 149 C 196 149 214 150 250 151" fill="none" stroke="#fc8019" stroke-width="2.5" opacity="0.85"/>
+    <path d="M 160 253 C 210 253 204 160 250 154" fill="none" stroke="#fc8019" stroke-width="2.5" opacity="0.85"/>
+
+    <!-- hub -->
+    <rect x="254" y="108" width="170" height="90" rx="16" fill="#241a10" stroke="#fc8019" stroke-width="2"/>
+    <text x="270" y="146" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="21" font-weight="800" fill="#fc8019">swiggy-lyr</text>
+    <text x="270" y="172" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13.5" fill="#a89a86">stdio · one Bearer</text>
+
+    <!-- exit arrow to agent -->
+    <path d="M 424 153 H 446" stroke="#fc8019" stroke-width="2.5"/>
+    <path d="M 440 146 L 450 153 L 440 160" fill="none" stroke="#fc8019" stroke-width="2.5"/>
+
+    <g transform="translate(456 122)">
+      <rect width="60" height="62" rx="12" fill="#201710" stroke="#3a2c1c"/>
+      <text x="30" y="27" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16" font-weight="700" fill="#f7f1e8">your</text>
+      <text x="30" y="49" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16" font-weight="700" fill="#f7f1e8">agent</text>
+    </g>
+
+    <!-- prefix legend -->
+    <text x="0" y="322" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14.5" fill="#87796a">namespaced on arrival: food_… instamart_… dineout_…</text>
+  </g>
+</svg>

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="gate-title gate-desc">
+  <title id="gate-title">Two-layer order safety gate</title>
+  <desc id="gate-desc">A tool call passes through layer one, which requires the server environment variable SWIGGY_LYR_ALLOW_ORDERS=1, then through layer two, which requires confirm=true on the call itself. Failing either returns a hint instead of reaching Swiggy.</desc>
+
+  <rect width="1200" height="300" rx="26" fill="#161009"/>
+
+  <!-- pipeline -->
+  <g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">
+    <!-- call -->
+    <rect x="56" y="118" width="200" height="64" rx="14" fill="#201710" stroke="#3a2c1c"/>
+    <text x="76" y="145" font-size="18" font-weight="700" fill="#f7f1e8">agent calls</text>
+    <text x="76" y="168" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#fc8019">food_confirm_order</text>
+
+    <path d="M 256 150 H 306" stroke="#87796a" stroke-width="2"/>
+    <path d="M 300 144 L 310 150 L 300 156" fill="none" stroke="#87796a" stroke-width="2"/>
+
+    <!-- layer 1 -->
+    <rect x="314" y="96" width="252" height="108" rx="16" fill="#241a10" stroke="#fc8019" stroke-width="2"/>
+    <text x="334" y="128" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" letter-spacing="2" fill="#a89a86">LAYER 1 · PROCESS</text>
+    <text x="334" y="158" font-size="19" font-weight="700" fill="#f7f1e8">env allows orders?</text>
+    <text x="334" y="184" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#cfc2ae">SWIGGY_LYR_ALLOW_ORDERS=1</text>
+
+    <path d="M 566 150 H 616" stroke="#87796a" stroke-width="2"/>
+    <path d="M 610 144 L 620 150 L 610 156" fill="none" stroke="#87796a" stroke-width="2"/>
+
+    <!-- layer 2 -->
+    <rect x="624" y="96" width="252" height="108" rx="16" fill="#241a10" stroke="#fc8019" stroke-width="2"/>
+    <text x="644" y="128" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" letter-spacing="2" fill="#a89a86">LAYER 2 · PER CALL</text>
+    <text x="644" y="158" font-size="19" font-weight="700" fill="#f7f1e8">explicit confirmation?</text>
+    <text x="644" y="184" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#cfc2ae">confirm=true</text>
+
+    <path d="M 876 150 H 926" stroke="#87796a" stroke-width="2"/>
+    <path d="M 920 144 L 930 150 L 920 156" fill="none" stroke="#87796a" stroke-width="2"/>
+
+    <!-- upstream -->
+    <rect x="936" y="118" width="208" height="64" rx="14" fill="#241a10" stroke="#3fae72"/>
+    <text x="956" y="145" font-size="18" font-weight="700" fill="#f7f1e8">Swiggy upstream</text>
+    <text x="956" y="168" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#3fae72">order placed</text>
+  </g>
+
+  <!-- fail branches -->
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+    <path d="M 440 204 V 240" stroke="#b3552e" stroke-width="2"/>
+    <rect x="296" y="240" width="288" height="38" rx="10" fill="#201710" stroke="#b3552e"/>
+    <text x="312" y="265" font-size="15.5" fill="#d08a68">blocked — set ALLOW_ORDERS=1</text>
+
+    <path d="M 750 204 V 240" stroke="#b3552e" stroke-width="2"/>
+    <rect x="620" y="240" width="270" height="38" rx="10" fill="#201710" stroke="#b3552e"/>
+    <text x="636" y="265" font-size="15.5" fill="#d08a68">blocked — pass confirm=true</text>
+  </g>
+</svg>
