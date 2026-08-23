@@ -54,14 +54,33 @@ Everything else — search, menus, addresses, slots, order history — always wo
 
 ## Quick start
 
+**Fresh machine, one command** (bootstraps `uv` if missing — `uv` then provisions Python itself):
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/ishan-parihar/swiggy-lyr/main/install.sh | bash
+```
 
-# one-time browser consent (~5 day token)
-swiggy-lyr --login
+Already have `uv`? The direct equivalent:
 
-# verify
+```bash
+uv tool install git+https://github.com/ishan-parihar/swiggy-lyr.git
+```
+
+Then authenticate and verify:
+
+```bash
+swiggy-lyr --login      # one-time browser consent (~5 day token)
 swiggy-lyr --status
+```
+
+> **PyPI:** once the repo is configured as a trusted publisher on PyPI, pushing a `v*` tag publishes the package and `uv tool install swiggy-lyr` becomes the shortest path. The workflows are already in place (`.github/workflows/publish.yml`).
+
+Upgrade / reinstall / remove:
+
+```bash
+uv tool upgrade swiggy-lyr          # pull latest main
+uv tool install --force --reinstall git+https://github.com/ishan-parihar/swiggy-lyr.git
+uv tool uninstall swiggy-lyr
 ```
 
 Point your agent at it:

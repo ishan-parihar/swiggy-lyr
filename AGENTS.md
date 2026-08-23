@@ -46,11 +46,24 @@ swiggy_lyr/
 
 ## Release Process
 
-Pushing to `main` is the release (source installs via install.sh). Before pushing:
+Two channels:
+
+**Source installs (default today):** install.sh and `uv tool install git+…` always
+build from `main` — pushing to main is the release for git users. Before pushing:
 
 ```bash
 uv version --bump patch && uv lock
 uv run ruff check . && uv run pytest -q
+```
+
+**PyPI (tag-gated):** pushing `v*` runs CI, then trusted-publishes to PyPI
+(`.github/workflows/publish.yml`). One-time setup: add the repo as a trusted
+publisher on PyPI (owner/ishan-parihar, repo/swiggy-lyr, workflow publish.yml,
+environment pypi). Until then the publish job fails harmlessly; git installs
+are unaffected.
+
+```bash
+git tag v0.1.1 && git push origin v0.1.1
 ```
 
 ## Commit Messages
