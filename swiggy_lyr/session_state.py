@@ -10,7 +10,11 @@ import os
 import time
 from pathlib import Path
 
-from swiggy_lyr.exceptions import NotAuthenticatedError, TokenExpiredError
+from swiggy_lyr.exceptions import (
+    NotAuthenticatedError,
+    SessionStateError,
+    TokenExpiredError,
+)
 
 TOKEN_DIR = Path.home() / ".swiggy-lyr"
 TOKEN_PATH = TOKEN_DIR / "token.json"
@@ -22,9 +26,14 @@ def save_token(payload: dict) -> Path:
     """Persist token payload. Adds mode=oauth unless the caller set it."""
     payload.setdefault("mode", "oauth")
     payload.setdefault("saved_at", int(time.time()))
-    TOKEN_DIR.mkdir(parents=True, exist_ok=True)
-    TOKEN_PATH.write_text(json.dumps(payload, indent=2))
-    TOKEN_PATH.chmod(0o600)
+    try:
+        TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+        TOKEN_PATH.write_text(json.dumps(payload, indent=2))
+        TOKEN_PATH.chmod(0o600)
+    except OSError as e:
+        raise SessionStateError(
+            f"Cannot write {TOKEN_PATH}: {e}", hint="Check ~/.swiggy-lyr permissions"
+        ) from e
     return TOKEN_PATH
 
 
@@ -61,9 +70,9 @@ def get_bearer_token() -> tuple[str, str]:
 
     source is "env" or "file" so status output can say where auth came from.
     """
-    env_token = os.environ.get(ENV_VAR)
+    env_token = (os.environ.get(ENV_VAR) or "").strip()
     if env_token:
-        return env_token.strip(), "env"
+        return env_token, "env"
 
     payload = load_token()
     if not payload or not payload.get("access_token"):

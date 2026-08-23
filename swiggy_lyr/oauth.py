@@ -119,8 +119,25 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
         _CallbackState.done.set()
 
-    def log_message(self, *args):  # silence per-request stderr spam
+    def log_message(self, format, *args):  # noqa: A002 (stdlib signature)
         pass
+
+
+def validate_callback_query(query: dict[str, list[str]], expected_state: str) -> str:
+    """Validate the OAuth redirect params; return the authorization code.
+
+    Raises OAuthError on provider-denied flows, missing code, or state
+    mismatch (possible CSRF).
+    """
+    if "error" in query:
+        desc = (query.get("error_description") or [""])[0]
+        raise OAuthError(f"Authorization denied: {query['error'][0]} {desc}".strip())
+    code = (query.get("code") or [None])[0]
+    if not code:
+        raise OAuthError("OAuth redirect carried no authorization code")
+    if (query.get("state") or [""])[0] != expected_state:
+        raise OAuthError("state mismatch — possible CSRF, aborting")
+    return code
 
 
 def wait_for_callback(port: int, timeout: int = CALLBACK_TIMEOUT) -> dict[str, list[str]]:
@@ -135,6 +152,8 @@ def wait_for_callback(port: int, timeout: int = CALLBACK_TIMEOUT) -> dict[str, l
             server.handle_request()
     finally:
         server.server_close()
+        _CallbackState.done.clear()
+        _CallbackState.query = None
     return _CallbackState.query or {}
 
 
@@ -196,17 +215,10 @@ async def run_login_flow() -> dict:
     _CallbackState.query = None
     _CallbackState.done.clear()
     query = wait_for_callback(port)
-
-    if "error" in query:
-        desc = (query.get("error_description") or [""])[0]
-        raise OAuthError(f"Authorization denied: {query['error'][0]} {desc}".strip())
-    if not query.get("code"):
-        raise OAuthError("OAuth redirect carried no authorization code")
-    if query.get("state", [""])[0] != state:
-        raise OAuthError("state mismatch — possible CSRF, aborting")
+    code = validate_callback_query(query, state)
 
     print("▸ Exchanging code for Bearer token…")
-    tokens = await exchange_code(meta, query["code"][0], verifier, client_id, redirect_uri)
+    tokens = await exchange_code(meta, code, verifier, client_id, redirect_uri)
 
     expires_in = tokens.get("expires_in")
     payload = {

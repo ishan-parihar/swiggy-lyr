@@ -1,9 +1,17 @@
 class SwiggyLyrError(RuntimeError):
-    """Base error for swiggy-lyr. Carries an optional agent-facing hint."""
+    """Base error for swiggy-lyr. Carries an optional agent-facing hint.
+
+    __str__ embeds the hint so MCP isError content stays self-contained —
+    agents only see the message, never the attribute.
+    """
 
     def __init__(self, message: str, hint: str | None = None):
         super().__init__(message)
+        self.message = message
         self.hint = hint
+
+    def __str__(self) -> str:
+        return f"{self.message} (hint: {self.hint})" if self.hint else self.message
 
 
 class OAuthError(SwiggyLyrError):

@@ -42,12 +42,19 @@ _MUTATING = (
     "book",
     "customize",
     "clear",
+    "reorder",
 )
 _HIGH_RISK = ("checkout", "place_order", "place-order")
+
+# Leading read verbs win outright: get_bookings / view_cart are reads even
+# though they contain gated substrings ("book", …).
+_READ_VERBS = frozenset({"get", "list", "view", "search", "browse", "track", "fetch", "check"})
 
 
 def is_mutating(tool_name: str) -> bool:
     lowered = tool_name.lower()
+    if lowered.split("_", 1)[0] in _READ_VERBS:
+        return False
     return any(k in lowered for k in _MUTATING)
 
 
@@ -125,6 +132,22 @@ def make_tool(upstream_name: str, description: str, input_schema: dict, url: str
     return _impl
 
 
+def _run_discovery(coro):
+    """Await a discovery coroutine from sync context, loop or no loop."""
+    import asyncio
+    import concurrent.futures
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    # Already inside an event loop (e.g. server built lazily) — bridge via thread.
+    # ponytail: one-shot thread per stream startup; a shared executor only if
+    # this ever runs hot.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
+
+
 def register_stream_tools(
     mcp: FastMCP,
     stream_name: str,
@@ -143,9 +166,7 @@ def register_stream_tools(
     caller = caller or call_stream_tool
     if tools is None:
         try:
-            import asyncio
-
-            tools = asyncio.run((lister or list_stream_tools)(url))
+            tools = _run_discovery((lister or list_stream_tools)(url))
         except Exception as e:
             logger.warning("Stream %s unavailable (%s) — skipped", stream_name, e)
             return 0
@@ -153,7 +174,10 @@ def register_stream_tools(
     prefix = TOOL_PREFIX[stream_name]
     registered = 0
     for t in tools:
-        name = getattr(t, "name", None) or t.get("name")
+        name = getattr(t, "name", None) or (t.get("name") if isinstance(t, dict) else None)
+        if not name:
+            logger.warning("Stream %s has an unnamed tool — skipped", stream_name)
+            continue
         desc = getattr(t, "description", None) or (
             t.get("description") if isinstance(t, dict) else ""
         )

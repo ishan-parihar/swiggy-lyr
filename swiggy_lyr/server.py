@@ -1,5 +1,6 @@
 from fastmcp import FastMCP
 
+from swiggy_lyr.exceptions import UpstreamError
 from swiggy_lyr.tools import (
     register_dineout_tools,
     register_food_tools,
@@ -28,6 +29,11 @@ def create_mcp_server() -> FastMCP:
     logging.getLogger("swiggy_lyr").info(
         "swiggy-lyr ready: food=%d instamart=%d dineout=%d", food, instamart, dineout
     )
+    if food + instamart + dineout == 0:
+        raise UpstreamError(
+            "No Swiggy streams reachable — 0 tools registered",
+            hint="Run swiggy-lyr --login first; then swiggy-lyr --status",
+        )
     return mcp
 
 

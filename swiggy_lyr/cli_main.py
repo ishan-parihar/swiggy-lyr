@@ -84,7 +84,7 @@ def cmd_serve(args: argparse.Namespace) -> None:
     try:
         run(transport=args.transport, host=args.host, port=args.port)
     except SwiggyLyrError as e:
-        axi_error(str(e), e.hint)
+        axi_error(e.message, e.hint)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> None:
         else:
             cmd_serve(args)
     except SwiggyLyrError as e:
-        axi_error(str(e), e.hint)
+        axi_error(e.message, e.hint)
 
 
 if __name__ == "__main__":

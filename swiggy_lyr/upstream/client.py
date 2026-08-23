@@ -7,7 +7,11 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-from swiggy_lyr.exceptions import TokenExpiredError, UpstreamError
+from swiggy_lyr.exceptions import (
+    SwiggyLyrError,
+    TokenExpiredError,
+    UpstreamError,
+)
 from swiggy_lyr.logging_config import logger
 from swiggy_lyr.session_state import get_bearer_token
 
@@ -23,8 +27,9 @@ def _auth_headers() -> dict[str, str]:
 # pool only if agent latency measurably matters.
 async def list_stream_tools(url: str) -> list:
     """Return the upstream Tool definitions exposed by one stream."""
+    headers = _auth_headers()  # outside try: auth failures must stay typed
     try:
-        async with streamablehttp_client(url, headers=_auth_headers(), timeout=INIT_TIMEOUT_S) as (
+        async with streamablehttp_client(url, headers=headers, timeout=INIT_TIMEOUT_S) as (
             read,
             write,
             _get_session_id,
@@ -39,8 +44,9 @@ async def list_stream_tools(url: str) -> list:
 
 async def call_stream_tool(url: str, tool_name: str, arguments: dict) -> dict:
     """Invoke one upstream tool; normalize the result to plain JSON."""
+    headers = _auth_headers()  # outside try: auth failures must stay typed
     try:
-        async with streamablehttp_client(url, headers=_auth_headers(), timeout=INIT_TIMEOUT_S) as (
+        async with streamablehttp_client(url, headers=headers, timeout=INIT_TIMEOUT_S) as (
             read,
             write,
             _get_session_id,
@@ -49,6 +55,8 @@ async def call_stream_tool(url: str, tool_name: str, arguments: dict) -> dict:
                 await session.initialize()
                 result = await session.call_tool(tool_name, arguments or {})
                 return _normalize(result)
+    except SwiggyLyrError:
+        raise
     except Exception as e:
         raise _translate(e, url) from e
 
@@ -64,7 +72,7 @@ def _normalize(result) -> dict:
     }
 
 
-def _translate(e: Exception, url: str) -> UpstreamError:
+def _translate(e: Exception, url: str) -> SwiggyLyrError:
     msg = str(e)
     lowered = msg.lower()
     if "401" in msg or "unauthorized" in lowered or "token expired" in lowered:
