@@ -42,29 +42,38 @@ def make_pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
-async def discover_authorization_server(origin: str = MCP_ORIGIN) -> dict:
-    """RFC 9728 discovery. Returns authorization-server metadata."""
+async def discover_authorization_server(origin: str = MCP_ORIGIN, path: str = "") -> dict:
+    """RFC 9728 discovery. Returns authorization-server metadata.
+
+    Tries path-scoped protected-resource metadata first (MCP spec), then root
+    protected-resource, then root auth-server metadata (Swiggy exposes this).
+    """
+    candidates = []
+    if path:
+        candidates.append(f"{origin}/.well-known/oauth-protected-resource{path}")
+    candidates.append(f"{origin}/.well-known/oauth-protected-resource")
+    candidates.append(f"{origin}/.well-known/oauth-authorization-server")
+
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
         resource_meta = None
-        for url in (
-            f"{origin}/.well-known/oauth-protected-resource",
-            f"{origin}/.well-known/oauth-authorization-server",
-        ):
+        for url in candidates:
             try:
                 resp = await client.get(url)
             except httpx.HTTPError as e:
                 raise OAuthError(f"Cannot reach {origin}: {e}") from e
-            if resp.status_code == 200:
-                doc = resp.json()
-                # Root auth-server metadata found directly.
-                if url.endswith("oauth-authorization-server"):
-                    return doc
-                resource_meta = doc
-                break
+            if resp.status_code != 200:
+                continue
+            doc = resp.json()
+            # Root auth-server metadata found directly.
+            if url.endswith("oauth-authorization-server"):
+                return doc
+            resource_meta = doc
+            break
 
-        servers = (resource_meta or {}).get("authorization_servers") or [origin]
+        servers = (resource_meta or {}).get("authorization_servers") or [f"{origin}/auth"]
         base = str(servers[0]).rstrip("/")
-        root = f"{urlparse(base).scheme}://{urlparse(base).netloc}"
+        parsed = urlparse(base)
+        root = f"{parsed.scheme}://{parsed.netloc}"
         resp = await client.get(f"{root}/.well-known/oauth-authorization-server")
         if resp.status_code != 200:
             raise OAuthError(
@@ -88,7 +97,7 @@ async def register_client(meta: dict, redirect_uri: str) -> str | None:
     payload = {
         "client_name": "swiggy-lyr",
         "redirect_uris": [redirect_uri],
-        "grant_types": ["authorization_code"],
+        "grant_types": ["authorization_code", "refresh_token"],
         "response_types": ["code"],
         "token_endpoint_auth_method": "none",
         "code_challenge_method": "S256",
@@ -106,18 +115,33 @@ async def register_client(meta: dict, redirect_uri: str) -> str | None:
 class _CallbackState:
     query: dict[str, list[str]] | None = None
     done = threading.Event()
+    raw_requests: list[str] = []
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802 (http.server API)
-        _CallbackState.query = parse_qs(urlparse(self.path).query)
-        body = b"<h2>swiggy-lyr</h2><p>Authorized. You can close this window.</p>"
-        self.send_response(200 if "code" in (_CallbackState.query or {}) else 400)
+        _CallbackState.raw_requests.append(self.path)
+        logger.info("OAuth callback hit: %s", self.path[:120])
+        query = parse_qs(urlparse(self.path).query)
+        if not query:
+            # favicon.ico and other noise — never clobber captured params
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        _CallbackState.query = query
+        ok = "code" in query
+        body = (
+            b"<h2>swiggy-lyr</h2><p>Authorized. You can close this window.</p>"
+            if ok
+            else b"<h2>swiggy-lyr</h2><p>Authorization failed - check the terminal.</p>"
+        )
+        self.send_response(200 if ok else 400)
         self.send_header("Content-Type", "text/html")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
-        _CallbackState.done.set()
+        _CallbackState.done.set()  # any real OAuth response ends the wait
 
     def log_message(self, format, *args):  # noqa: A002 (stdlib signature)
         pass
@@ -151,10 +175,12 @@ def wait_for_callback(port: int, timeout: int = CALLBACK_TIMEOUT) -> dict[str, l
                 raise OAuthError("Timed out waiting for OAuth redirect")
             server.handle_request()
     finally:
+        # snapshot BEFORE resetting state — the finally runs before return value is read
+        query = _CallbackState.query or {}
         server.server_close()
         _CallbackState.done.clear()
         _CallbackState.query = None
-    return _CallbackState.query or {}
+    return query
 
 
 async def exchange_code(
@@ -175,6 +201,74 @@ async def exchange_code(
     if resp.status_code != 200:
         raise OAuthError(f"Token exchange failed: {resp.status_code} {resp.text[:300]}")
     return resp.json()
+
+
+async def try_refresh_stored_token() -> str | None:
+    """Silently renew via refresh_token grant. Returns new access token or None.
+
+    None means: no refresh token stored (manual/env tokens), or the server
+    rejected the grant — caller should surface a re-login hint.
+    """
+    import time
+
+    from swiggy_lyr.session_state import load_token, save_token
+
+    payload = load_token() or {}
+    refresh_token = payload.get("refresh_token")
+    client_id = payload.get("client_id") or "swiggy-mcp"
+    if not refresh_token:
+        return None
+
+    try:
+        meta = await discover_authorization_server()
+        token_ep = meta.get("token_endpoint")
+        if not token_ep:
+            return None
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                token_ep,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": client_id,
+                },
+            )
+    except Exception as e:
+        logger.warning("Token refresh failed: %s", e)
+        return None
+    if resp.status_code != 200:
+        logger.warning("Token refresh rejected: %s %s", resp.status_code, resp.text[:150])
+        return None
+
+    tokens = resp.json()
+    expires_in = tokens.get("expires_in")
+    merged = {
+        **payload,
+        **tokens,
+        "mode": "oauth",
+        "expires_at": int(time.time() + expires_in) if expires_in else None,
+    }
+    save_token(merged)
+    logger.info("Swiggy token refreshed silently")
+    return merged["access_token"]
+
+
+async def ensure_fresh_token() -> str:
+    """Bearer token for requests; silent refresh when past expiry.
+
+    Raises NotAuthenticatedError/TokenExpiredError when nothing can be renewed.
+    """
+    from swiggy_lyr.exceptions import TokenExpiredError
+    from swiggy_lyr.session_state import get_bearer_token
+
+    try:
+        token, _ = get_bearer_token()
+        return token
+    except TokenExpiredError:
+        refreshed = await try_refresh_stored_token()
+        if refreshed is None:
+            raise
+        return refreshed
 
 
 async def run_login_flow() -> dict:

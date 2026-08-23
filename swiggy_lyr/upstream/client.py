@@ -23,11 +23,18 @@ def _auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+async def _fresh_auth_headers() -> dict[str, str]:
+    """Like _auth_headers but silently refreshes an expired stored token."""
+    from swiggy_lyr.oauth import ensure_fresh_token
+
+    return {"Authorization": f"Bearer {await ensure_fresh_token()}"}
+
+
 # ponytail: fresh connection per call (~200ms overhead) — persistent session
 # pool only if agent latency measurably matters.
 async def list_stream_tools(url: str) -> list:
     """Return the upstream Tool definitions exposed by one stream."""
-    headers = _auth_headers()  # outside try: auth failures must stay typed
+    headers = await _fresh_auth_headers()  # outside try: auth failures must stay typed
     try:
         async with streamablehttp_client(url, headers=headers, timeout=INIT_TIMEOUT_S) as (
             read,
@@ -44,7 +51,7 @@ async def list_stream_tools(url: str) -> list:
 
 async def call_stream_tool(url: str, tool_name: str, arguments: dict) -> dict:
     """Invoke one upstream tool; normalize the result to plain JSON."""
-    headers = _auth_headers()  # outside try: auth failures must stay typed
+    headers = await _fresh_auth_headers()  # outside try: auth failures must stay typed
     try:
         async with streamablehttp_client(url, headers=headers, timeout=INIT_TIMEOUT_S) as (
             read,

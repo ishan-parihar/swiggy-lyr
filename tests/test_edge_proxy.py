@@ -59,9 +59,9 @@ def test_mutation_matrix(name, mutating):
         ("checkout_cart", True),
         ("instamart_place_order", True),
         ("place-order-v2", True),
+        ("book_table", True),  # live finding: bookings are real-world commitments
         ("add_to_cart", False),
         ("cancel_order", False),
-        ("book_table", False),
     ],
 )
 def test_high_risk_matrix(name, risky):
@@ -72,6 +72,9 @@ def test_get_booking_details_is_read():
     # regression guard: "booking" must not trip the "book" substring on reads
     assert not is_mutating("get_bookings")
     assert not is_mutating("list_bookings")
+    # ...but the booking ACTION itself stays high-risk
+    assert is_high_risk("book_table")
+    assert is_mutating("book_table")
 
 
 # ── build_signature edge cases ───────────────────────────────────────────

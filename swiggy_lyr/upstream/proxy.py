@@ -28,6 +28,8 @@ JSON_TYPE_MAP: dict[str, Any] = {
 # Substring match on the *upstream* tool name.
 # ponytail: verb-substring heuristic, biased to over-block (a mis-flagged read
 # just needs ALLOW_ORDERS=1; a missed mutation would spend real money).
+# Verbs below are derived from Swiggy's LIVE tool inventory (Aug 2026):
+# place_food_order, *_confirm_order, flush_food_cart, create_cart, checkout…
 _MUTATING = (
     "add",
     "update",
@@ -35,16 +37,26 @@ _MUTATING = (
     "delete",
     "edit",
     "checkout",
-    "place_order",
+    "place",
     "submit",
     "apply",
     "cancel",
     "book",
     "customize",
     "clear",
+    "flush",
+    "create",
+    "confirm",
     "reorder",
 )
-_HIGH_RISK = ("checkout", "place_order", "place-order")
+_HIGH_RISK = (
+    "checkout",
+    "confirm",
+    "place",
+    # free-tier Dineout reservations are still real-world commitments
+    # (a table gets held) — live finding: book_table passed layer-1 alone.
+    "book",
+)
 
 # Leading read verbs win outright: get_bookings / view_cart are reads even
 # though they contain gated substrings ("book", …).
