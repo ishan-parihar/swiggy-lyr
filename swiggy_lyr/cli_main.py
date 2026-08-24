@@ -10,6 +10,7 @@ import sys
 
 from swiggy_lyr import __version__
 from swiggy_lyr.exceptions import SwiggyLyrError
+from swiggy_lyr.logging_config import logger
 
 HOME_VIEW = """\
 swiggy-lyr — unified Swiggy MCP (Food + Instamart + Dineout) for AI agents
@@ -33,7 +34,10 @@ env:
   SWIGGY_LYR_TOKEN        bypass stored token (CI / manual)
   SWIGGY_LYR_CLIENT_ID    pre-registered OAuth client if DCR is unavailable
   SWIGGY_LYR_ALLOW_ORDERS enable mutating tools (default off)
+  SWIGGY_LYR_PORT         loopback port for the OAuth callback (default 9876)
   SWIGGY_REDIRECT_URI     override callback URI (default http://localhost:9876/callback)
+
+exit codes: 0 ok · 2 error or not authenticated
 """
 
 
@@ -52,7 +56,7 @@ def axi_error(msg: str, hint: str | None = None, code: int = 2):
     sys.exit(code)
 
 
-def cmd_status() -> None:
+def cmd_status() -> int:
     from swiggy_lyr.authentication import get_auth_status
     from swiggy_lyr.session_state import TOKEN_PATH
 
@@ -63,6 +67,8 @@ def cmd_status() -> None:
     print(f'token_path: "{TOKEN_PATH}"')
     if not status["authenticated"]:
         print(_kv("help", "Run swiggy-lyr --login"))
+        return 2
+    return 0
 
 
 def cmd_login(args: argparse.Namespace) -> None:
@@ -105,15 +111,30 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args(argv)
 
+    if args.token and not args.login:
+        # silently ignoring --token here would start an unauthenticated server
+        axi_error(
+            "--token requires --login",
+            hint="Run: swiggy-lyr --login --token BEARER",
+        )
+
     try:
         if args.login:
             cmd_login(args)
         elif args.status:
-            cmd_status()
+            code = cmd_status()
+            if code:
+                sys.exit(code)
         else:
             cmd_serve(args)
     except SwiggyLyrError as e:
         axi_error(e.message, e.hint)
+    except KeyboardInterrupt:
+        print('interrupted: "ok"')
+        sys.exit(130)
+    except Exception as e:  # never leak raw tracebacks from the CLI boundary
+        logger.debug("untyped CLI failure", exc_info=True)
+        axi_error(f"{type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":

@@ -59,6 +59,7 @@ DINEOUT_TOOLS = [
     "get_saved_locations",
     "render_restaurants_dineout",
     "report_error",
+    "search_restaurants_dineout",
 ]
 
 ALL_LIVE = FOOD_TOOLS + INSTAMART_TOOLS + DINEOUT_TOOLS
@@ -116,3 +117,28 @@ def test_read_verbs_win_even_with_mutation_substrings():
     assert not is_mutating("track_order")
     assert not is_mutating("get_booking_status")
     assert not is_mutating("get_food_orders")
+
+
+# ── documented-inventory drift guard (README / SKILL.md claim 44 tools) ──
+
+
+def test_documented_counts_match_fixtures():
+    """README + SKILL.md advertise food=18, instamart=14, dineout=12 (44 total).
+
+    If a live recount changes these numbers, update the fixtures AND the docs
+    in the same commit — this test exists so they can never silently diverge.
+    """
+    assert len(FOOD_TOOLS) == 18
+    assert len(INSTAMART_TOOLS) == 14
+    assert len(DINEOUT_TOOLS) == 12
+    assert sum(len(g) for g in (FOOD_TOOLS, INSTAMART_TOOLS, DINEOUT_TOOLS)) == 44
+    # cross-stream name sharing is expected (tools get prefixed per stream),
+    # but a stream must never list the same tool twice
+    for group in (FOOD_TOOLS, INSTAMART_TOOLS, DINEOUT_TOOLS):
+        assert len(group) == len(set(group))
+
+
+def test_dineout_search_is_a_read():
+    # regression: search_restaurants_dineout was missing from the fixture set
+    assert not is_mutating("search_restaurants_dineout")
+    assert not is_high_risk("search_restaurants_dineout")

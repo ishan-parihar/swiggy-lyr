@@ -3,7 +3,7 @@
 import os
 import time
 
-from swiggy_lyr.session_state import get_bearer_token, load_token
+from swiggy_lyr.session_state import ENV_VAR, get_bearer_token, load_token
 
 
 def validate_session() -> bool:
@@ -15,26 +15,31 @@ def validate_session() -> bool:
 
 
 def get_auth_status() -> dict:
-    env_token = os.environ.get("SWIGGY_LYR_TOKEN")
+    """Auth state for `--status`. The env token wins when present: it is what
+    every upstream call would actually use, so file-derived fields must not
+    masquerade as its properties."""
     payload = load_token()
 
-    authenticated = False
-    source = None
-    mode = None
-    expires_in_days = None
+    if (os.environ.get(ENV_VAR) or "").strip():
+        return {
+            "authenticated": True,
+            "mode": "env",
+            "source": "env",
+            "expires_in_days": None,  # env tokens carry no known expiry
+        }
 
+    authenticated = False
     try:
-        _, src = get_bearer_token()
+        get_bearer_token()
         authenticated = True
-        source = src
-        mode = "env" if env_token else ("oauth" if payload else "env")
     except Exception:
         pass
 
+    mode = None
+    expires_in_days = None
     if payload:
         stored_mode = payload.get("mode")
-        if stored_mode:
-            mode = stored_mode
+        mode = str(stored_mode) if stored_mode else None
         exp = payload.get("expires_at")
         if isinstance(exp, (int, float)):
             expires_in_days = round(max(0.0, (exp - time.time()) / 86400), 1)
@@ -42,6 +47,6 @@ def get_auth_status() -> dict:
     return {
         "authenticated": authenticated,
         "mode": mode,
-        "source": source,
+        "source": "file" if authenticated else None,
         "expires_in_days": expires_in_days,
     }

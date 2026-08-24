@@ -7,7 +7,9 @@ def test_status_unauthenticated(capsys, monkeypatch, tmp_path):
     monkeypatch.delenv("SWIGGY_LYR_TOKEN", raising=False)
     monkeypatch.setattr("swiggy_lyr.session_state.TOKEN_PATH", tmp_path / "none.json")
     monkeypatch.setattr("swiggy_lyr.session_state.TOKEN_DIR", tmp_path)
-    main(["--status"])
+    with pytest.raises(SystemExit) as exc:  # regression B12: unauth must not exit 0
+        main(["--status"])
+    assert exc.value.code == 2
     out = capsys.readouterr().out
     assert "authenticated: false" in out
     assert "help:" in out

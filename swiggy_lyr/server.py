@@ -6,9 +6,17 @@ from swiggy_lyr.tools import (
     register_food_tools,
     register_instamart_tools,
 )
+from swiggy_lyr.upstream.proxy import _run_discovery, discover_streams
+from swiggy_lyr.upstream.streams import STREAMS
 
 
-def create_mcp_server() -> FastMCP:
+def create_mcp_server(discovered: dict[str, list] | None = None) -> FastMCP:
+    """Build the server.
+
+    `discovered` injects pre-fetched tool inventories ({stream: tools}); when
+    omitted, all three streams are discovered concurrently here. Streams whose
+    inventory is empty/missing register zero tools but never block the others.
+    """
     mcp = FastMCP(
         "swiggy-lyr",
         instructions=(
@@ -20,9 +28,12 @@ def create_mcp_server() -> FastMCP:
         ),
     )
 
-    food = register_food_tools(mcp)
-    instamart = register_instamart_tools(mcp)
-    dineout = register_dineout_tools(mcp)
+    if discovered is None:
+        discovered = _run_discovery(discover_streams(STREAMS))
+
+    food = register_food_tools(mcp, tools=discovered.get("food", []))
+    instamart = register_instamart_tools(mcp, tools=discovered.get("instamart", []))
+    dineout = register_dineout_tools(mcp, tools=discovered.get("dineout", []))
 
     import logging
 

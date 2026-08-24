@@ -174,7 +174,15 @@ class _Result:
 
 def test_normalize_prefers_structured():
     r = _Result(structured={"a": 1}, content=[_Content("ignored")])
-    assert _normalize(r) == {"data": {"a": 1}}
+    assert _normalize(r) == {"data": {"a": 1}, "is_error": False}
+
+
+def test_normalize_structured_error_keeps_flag():
+    """Regression B6: upstream errors WITH structuredContent used to look like data."""
+    r = _Result(structured={"cart": None}, is_error=True)
+    out = _normalize(r)
+    assert out["is_error"] is True
+    assert out["data"] == {"cart": None}
 
 
 def test_normalize_joins_texts_and_error_flag():

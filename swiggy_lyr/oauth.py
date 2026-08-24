@@ -63,7 +63,12 @@ async def discover_authorization_server(origin: str = MCP_ORIGIN, path: str = ""
                 raise OAuthError(f"Cannot reach {origin}: {e}") from e
             if resp.status_code != 200:
                 continue
-            doc = resp.json()
+            try:
+                doc = resp.json()
+            except ValueError as je:
+                raise OAuthError(
+                    f"Non-JSON response from {url} — upstream layout may have changed",
+                ) from je
             # Root auth-server metadata found directly.
             if url.endswith("oauth-authorization-server"):
                 return doc
@@ -80,7 +85,10 @@ async def discover_authorization_server(origin: str = MCP_ORIGIN, path: str = ""
                 f"No authorization-server metadata at {root}",
                 hint="Swiggy may have changed its OAuth layout — check their manifest repo.",
             )
-        return resp.json()
+        try:
+            return resp.json()
+        except ValueError as je:
+            raise OAuthError(f"Non-JSON authorization-server metadata at {root}") from je
 
 
 async def register_client(meta: dict, redirect_uri: str) -> str | None:
@@ -119,12 +127,22 @@ class _CallbackState:
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
+    # Only requests on the redirect URI's path count as OAuth responses;
+    # anything else (favicon, scanners, stray tabs) is noise.
+    callback_path = "/callback"
+
     def do_GET(self):  # noqa: N802 (http.server API)
         _CallbackState.raw_requests.append(self.path)
         logger.info("OAuth callback hit: %s", self.path[:120])
-        query = parse_qs(urlparse(self.path).query)
+        parsed = urlparse(self.path)
+        if parsed.path != self.callback_path:
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        query = parse_qs(parsed.query)
         if not query:
-            # favicon.ico and other noise — never clobber captured params
+            # path match but empty params — treat as noise too
             self.send_response(404)
             self.send_header("Content-Length", "0")
             self.end_headers()
@@ -164,10 +182,27 @@ def validate_callback_query(query: dict[str, list[str]], expected_state: str) ->
     return code
 
 
-def wait_for_callback(port: int, timeout: int = CALLBACK_TIMEOUT) -> dict[str, list[str]]:
-    """Block until the browser hits our loopback callback. Returns query params."""
-    server = HTTPServer(("127.0.0.1", port), _CallbackHandler)
+def bind_callback_server(port: int, callback_path: str = "/callback") -> HTTPServer:
+    """Bind the loopback callback server BEFORE the browser opens.
+
+    Binding first guarantees that even an instantly-approved consent redirect
+    finds a listening socket. Raises a typed OAuthError when the port is busy.
+    """
+    _CallbackHandler.callback_path = callback_path or "/callback"
+    try:
+        server = HTTPServer(("127.0.0.1", port), _CallbackHandler)
+    except OSError as e:
+        raise OAuthError(
+            f"Cannot bind callback port {port}: {e}",
+            hint="Port busy? Another login may be running — set SWIGGY_LYR_PORT "
+            "or SWIGGY_REDIRECT_URI and retry.",
+        ) from e
     server.timeout = 1
+    return server
+
+
+def serve_callback(server: HTTPServer, timeout: int = CALLBACK_TIMEOUT) -> dict[str, list[str]]:
+    """Pump the bound server until the OAuth response arrives. Returns params."""
     deadline = time.time() + timeout
     try:
         while not _CallbackState.done.is_set():
@@ -181,6 +216,11 @@ def wait_for_callback(port: int, timeout: int = CALLBACK_TIMEOUT) -> dict[str, l
         _CallbackState.done.clear()
         _CallbackState.query = None
     return query
+
+
+def wait_for_callback(port: int, timeout: int = CALLBACK_TIMEOUT) -> dict[str, list[str]]:
+    """Bind + pump in one call (bind/serve split exists for the login flow)."""
+    return serve_callback(bind_callback_server(port), timeout)
 
 
 async def exchange_code(
@@ -209,14 +249,17 @@ async def try_refresh_stored_token() -> str | None:
     None means: no refresh token stored (manual/env tokens), or the server
     rejected the grant — caller should surface a re-login hint.
     """
-    import time
-
     from swiggy_lyr.session_state import load_token, save_token
 
     payload = load_token() or {}
     refresh_token = payload.get("refresh_token")
-    client_id = payload.get("client_id") or "swiggy-mcp"
+    client_id = payload.get("client_id")
     if not refresh_token:
+        return None
+    if not client_id:
+        # Refreshing with a guessed client_id would silently fail or, worse,
+        # succeed against the wrong client — refuse and ask for re-login.
+        logger.warning("Stored token has refresh_token but no client_id — cannot refresh")
         return None
 
     try:
@@ -275,6 +318,7 @@ async def run_login_flow() -> dict:
     """Full interactive flow. Prints progress; returns the saved payload."""
     port = int(os.environ.get("SWIGGY_LYR_PORT", DEFAULT_PORT))
     redirect_uri = os.environ.get("SWIGGY_REDIRECT_URI") or f"http://localhost:{port}/callback"
+    callback_path = urlparse(redirect_uri).path or "/callback"
 
     print("▸ Discovering Swiggy OAuth endpoints…")
     meta = await discover_authorization_server()
@@ -301,14 +345,18 @@ async def run_login_flow() -> dict:
 
     auth_url = f"{auth_ep}?{urlencode(params)}"
 
+    # Bind BEFORE opening the browser: an instantly-approved consent (returning
+    # session) redirects within milliseconds and must find a listening socket.
+    print(f"▸ Listening on {redirect_uri} …")
+    _CallbackState.query = None
+    _CallbackState.done.clear()
+    server = bind_callback_server(port, callback_path)
+
     print(f"▸ Opening browser for consent ({scope})…")
     print(f"  If it doesn't open, paste this URL into a browser:\n  {auth_url}")
     webbrowser.open(auth_url)
 
-    print(f"▸ Listening on {redirect_uri} …")
-    _CallbackState.query = None
-    _CallbackState.done.clear()
-    query = wait_for_callback(port)
+    query = serve_callback(server)
     code = validate_callback_query(query, state)
 
     print("▸ Exchanging code for Bearer token…")

@@ -42,7 +42,12 @@ swiggy_lyr/
   additionally require `confirm=true`. Do not weaken this gate.
 - Tests inject `lister=`/`caller=` fakes — never hit live Swiggy in CI.
 - Errors raise SwiggyLyrError subclasses carrying a `hint`; cli_main maps to
-  TOON stdout + exit 2. Upstream 401s become TokenExpiredError with a re-login hint.
+  TOON stdout + exit 2 (untyped exceptions included). `--status` exits 2 when
+  unauthenticated. Upstream 401s become TokenExpiredError with a re-login
+  hint — the mcp SDK wraps failures in ExceptionGroups, so error translation
+  must walk `e.exceptions`, never just `str(e)`.
+- Upstream tool registration is per-tool fault-isolated: one unproxiable tool
+  is skipped with an ERROR log; it never takes down its stream or server.
 
 ## Release Process
 

@@ -57,32 +57,49 @@ async def test_discovery_failure_inside_running_loop_returns_zero():
 
 
 def test_server_with_all_streams_down_raises(monkeypatch):
-    def dead(mcp):
+    def dead(mcp, tools=None):
         return 0
 
     monkeypatch.setattr("swiggy_lyr.server.register_food_tools", dead)
     monkeypatch.setattr("swiggy_lyr.server.register_instamart_tools", dead)
     monkeypatch.setattr("swiggy_lyr.server.register_dineout_tools", dead)
     with pytest.raises(UpstreamError, match="0 tools"):
-        create_mcp_server()
+        create_mcp_server(discovered={"food": [], "instamart": [], "dineout": []})
 
 
 def test_server_partial_stream_loss_still_serves(monkeypatch):
     from tests.fakes import fake_caller
 
-    def only_food(mcp):
+    def only_food(mcp, tools=None):
         return register_stream_tools(
             mcp, "food", "https://fake", tools=FAKE_TOOLS[:1], caller=fake_caller
         )
 
-    def dead(mcp):
+    def dead(mcp, tools=None):
         return 0
 
-    # patch names in server's namespace (server.py imported them directly)
+    # patch names in server's namespace (server.py imported them directly);
+    # discovered= bypasses live discovery so CI never touches the network
     monkeypatch.setattr("swiggy_lyr.server.register_food_tools", only_food)
     monkeypatch.setattr("swiggy_lyr.server.register_instamart_tools", dead)
     monkeypatch.setattr("swiggy_lyr.server.register_dineout_tools", dead)
-    mcp = create_mcp_server()  # must not raise
+    mcp = create_mcp_server(discovered={"food": FAKE_TOOLS[:1], "instamart": [], "dineout": []})
+    assert mcp  # must not raise
+    names = {t.name for t in _run(mcp.list_tools())}
+    assert names == {"food_search_restaurants"}
+
+
+def test_server_assembly_via_injected_discovery():
+    """Full registrar path with DI inventories — no patches, no network."""
+    from tests.fakes import FAKE_TOOLS as ALL_FAKES
+
+    mcp = create_mcp_server(
+        discovered={
+            "food": ALL_FAKES[:1],
+            "instamart": [],
+            "dineout": [],
+        }
+    )
     names = {t.name for t in _run(mcp.list_tools())}
     assert names == {"food_search_restaurants"}
 
@@ -136,9 +153,10 @@ async def test_login_flow_happy_path(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(oauth.secrets, "token_urlsafe", lambda n: "s")
     monkeypatch.setattr(
         oauth,
-        "wait_for_callback",
-        lambda port, timeout=300: {"code": ["auth-code"], "state": ["s"]},
+        "serve_callback",
+        lambda server, timeout=300: {"code": ["auth-code"], "state": ["s"]},
     )
+    monkeypatch.setattr(oauth, "bind_callback_server", lambda port, path="/callback": None)
     monkeypatch.setattr("webbrowser.open", lambda url: True)
 
     payload = await run_login_flow()
@@ -180,8 +198,11 @@ async def test_login_flow_state_mismatch_aborts(monkeypatch, tmp_path):
     monkeypatch.setattr(oauth, "register_client", fake_register)
     monkeypatch.setattr(oauth, "exchange_code", fake_exchange)
     monkeypatch.setattr(
-        oauth, "wait_for_callback", lambda port, timeout=300: {"code": ["c"], "state": ["evil"]}
+        oauth,
+        "serve_callback",
+        lambda server, timeout=300: {"code": ["c"], "state": ["evil"]},
     )
+    monkeypatch.setattr(oauth, "bind_callback_server", lambda port, path="/callback": None)
     monkeypatch.setattr("webbrowser.open", lambda url: True)
 
     with pytest.raises(OAuthError, match="state mismatch"):
@@ -204,9 +225,10 @@ async def test_login_flow_provider_denial(monkeypatch, tmp_path):
     monkeypatch.setattr(oauth, "register_client", fake_register)
     monkeypatch.setattr(
         oauth,
-        "wait_for_callback",
-        lambda port, timeout=300: {"error": ["access_denied"], "state": ["s"]},
+        "serve_callback",
+        lambda server, timeout=300: {"error": ["access_denied"], "state": ["s"]},
     )
+    monkeypatch.setattr(oauth, "bind_callback_server", lambda port, path="/callback": None)
     monkeypatch.setattr("webbrowser.open", lambda url: True)
 
     with pytest.raises(OAuthError, match="access_denied"):

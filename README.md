@@ -7,7 +7,7 @@
 <p align="center">
   <a href="#order-safety"><img src="https://img.shields.io/badge/ordering-safety--gated-fc8019?style=flat" alt="Ordering safety-gated"></a>
   <img src="https://img.shields.io/badge/live--verified-44%20tools%20on%20prod-3fae72?style=flat" alt="Live verified: 44 tools on production">
-  <img src="https://img.shields.io/badge/tests-173%20passing-2b6cb0?style=flat" alt="173 tests passing">
+  <img src="https://img.shields.io/badge/tests-197%20passing-2b6cb0?style=flat" alt="197 tests passing">
   <img src="https://img.shields.io/badge/python-3.11%2B-2b6cb0?style=flat&logo=python&logoColor=white" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/license-MIT-059669?style=flat" alt="MIT license">
 </p>
@@ -118,7 +118,7 @@ No scraping, no cookies, no reverse-engineered endpoints — just Swiggy's offic
 | `swiggy-lyr` | Start the MCP server on stdio |
 | `swiggy-lyr --login` | Browser consent flow (OAuth 2.1 + PKCE) |
 | `swiggy-lyr --login --token BEARER` | Store a token manually instead |
-| `swiggy-lyr --status` | Auth state, expiry countdown, token path |
+| `swiggy-lyr --status` | Auth state, expiry countdown, token path (exit 2 = not authenticated) |
 | `swiggy-lyr --transport http --port 8000` | Serve over HTTP instead of stdio |
 
 | Environment variable | Purpose |
@@ -126,7 +126,23 @@ No scraping, no cookies, no reverse-engineered endpoints — just Swiggy's offic
 | `SWIGGY_LYR_ALLOW_ORDERS` | Layer 1 of the gate — enables mutating tools |
 | `SWIGGY_LYR_TOKEN` | Bypass stored token (CI, manual) |
 | `SWIGGY_LYR_CLIENT_ID` | Pre-registered OAuth client if DCR changes |
+| `SWIGGY_LYR_PORT` | Loopback port for the OAuth callback (default 9876) |
 | `SWIGGY_REDIRECT_URI` | Override callback URI |
+
+## Troubleshooting
+
+- **`--token BEARER` alone is rejected** — tokens are stored only through the
+  login path: `swiggy-lyr --login --token BEARER`.
+- **"Cannot bind callback port"** during login — another login may be running;
+  set `SWIGGY_LYR_PORT=9877` (or any free port) and retry.
+- **Consent page rejects the redirect** — Swiggy whitelists specific callback
+  shapes (`http://localhost/callback` among them). If their validation ever
+  tightens against port-bearing URIs, override with
+  `SWIGGY_REDIRECT_URI="http://localhost/callback"` and open
+  `http://localhost/callback` manually after consenting.
+- **Streams missing at startup** — each stream is discovered independently and
+  in parallel; a stream that fails logs an ERROR line and the rest keep
+  serving. Zero reachable streams refuses to start (typed error, exit 2).
 
 ## Honest limits
 
@@ -139,7 +155,7 @@ No scraping, no cookies, no reverse-engineered endpoints — just Swiggy's offic
 ## Development
 
 ```bash
-uv sync && uv run pytest -q   # 173 tests, zero network
+uv sync && uv run pytest -q   # 197 tests, zero network
 uv run ruff check .
 uv run python tests/live_verify.py   # production verification (needs --login first)
 ```
