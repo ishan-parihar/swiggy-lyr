@@ -36,3 +36,4 @@ warn_until = "2026-11-18"  # warn until rollout+30d; after it a stale manual blo
 
 [card]
 status_into = "docs/handoff/STATE.md"
+architecture = "AGENTS.md#Architecture"
