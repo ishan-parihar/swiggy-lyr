@@ -18,6 +18,7 @@ uv run swiggy-lyr --status   # CLI status (TOON)
 uv run swiggy-lyr            # start server on stdio
 ```
 
+*(Commands reviewed 2026-10-19: the section above still holds the commands that build and test this repo.)*
 ## Architecture
 
 ```
