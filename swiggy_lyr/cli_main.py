@@ -109,8 +109,20 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("command", nargs="?", choices=("update", "upgrade"), help="update this CLI")
+    parser.add_argument("--check", action="store_true", help="check for updates without installing")
+    parser.add_argument("--json", action="store_true", help="print update result as JSON")
     args = parser.parse_args(argv)
 
+    if args.command:
+        from swiggy_lyr.updater import run_update
+
+        update_args = []
+        if args.check:
+            update_args.append("--check")
+        if args.json:
+            update_args.append("--json")
+        sys.exit(run_update(update_args, application="swiggy-lyr", package="swiggy-lyr"))
     if args.token and not args.login:
         # silently ignoring --token here would start an unauthenticated server
         axi_error(

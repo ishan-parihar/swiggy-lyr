@@ -78,10 +78,15 @@ swiggy-lyr --status
 Upgrade / reinstall / remove:
 
 ```bash
+swiggy-lyr update --check          # check without changing files
+swiggy-lyr update                  # delegate to the manager that owns this install
 uv tool upgrade swiggy-lyr          # pull latest main
 uv tool install --force --reinstall git+https://github.com/ishan-parihar/swiggy-lyr.git
 uv tool uninstall swiggy-lyr
 ```
+
+`swiggy-lyr upgrade` is an alias for `update`. The CLI delegates to `uv`, `pipx`,
+or `pip`; it does not overwrite package-manager-owned files.
 
 Point your agent at it:
 
